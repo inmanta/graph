@@ -19,8 +19,57 @@
 
 
 from Imp.export import export
+from Imp.ast.attribute import RelationAttribute
 
 import os, subprocess
+
+
+class relationCollector(object):
+    def __init__(self):
+        self.relations = dict()
+        self.nodes=set()
+        
+    def addNode(self,node):
+        self.nodes.add(node)
+    
+    def add(self,fro,to,label=None):
+        """add relation, overwrite any duplicate with same label and same ends (even if ends are swapped)"""
+        l = sorted([id(fro), id(to)])
+        self.nodes.add(fro)
+        self.nodes.add(to)
+        self.relations[("a",l[0], l[1],label)]=(id(fro), id(to),label)
+    
+    def addKeyed(self,key,fro,to,label=None):
+        """add relation, overwrite any duplicate with same key
+            best used for items with a natural ordering, such as parent child, where the key is (child,parent)"""
+        self.relations[key]=(id(fro), id(to),label)
+        self.nodes.add(fro)
+        self.nodes.add(to)
+    
+    def addDualKeyed(self,key,key2,fro,to,label=None):
+        """add relation, overwrite any duplicate with same key ends (even if they are swapped)
+            best used for pairs of relations"""
+        l = sorted([id(key), id(key2)])
+        self.relations[("dx",l[0],l[1])]=(id(fro), id(to),label)   
+        self.nodes.add(fro)
+        self.nodes.add(to)
+    
+    def dump(self):
+        dot = ""
+        
+        for node in self.nodes:
+            dot += '  "%s" [label="%s",shape=rect];\n' % (id(node), node.get_full_name())
+        
+        for rel in self.relations.values():
+            if rel[2] == None:
+                dot += '"%s" -- "%s";\n' % (rel[0],rel[1])
+            else:
+                dot += '"%s" -- "%s" [%s];\n' % rel
+          
+        return dot
+        
+        
+        
 
 def parse_cfg(cfg):
     entries = cfg.replace("]", "").split(",")
@@ -78,18 +127,37 @@ def parse_instance(line, scope):
         
     return dot
 
-def parse_class(line, scope):
+def parse_class(line, scope,relcollector):
     parts = line.split("::")
-    type_def = scope.get_variable(parts[-1], parts[:-1]).value
+        
+    if parts[-1].startswith('*'):
+        subscope = scope.get_scope(parts[:-1])
+        typedefs = subscope.get_variables()
+    else:
+        typedefs = [scope.get_variable(parts[-1], parts[:-1])]
     
     dot = ""
-    
-    dot += '  "%s" [label="%s",shape=rect];\n' % (id(type_def), type_def.get_full_name())
+    for type_def in typedefs:
+        type_def = type_def.value
+        if hasattr(type_def, "get_full_name"):
+            relcollector.addNode(type_def)    
+            if parts[-1] == '**':
+                addRelations(type_def,relcollector)
+        
     
     return dot
 
-def parse_instance_relation(link, scope):
-    relations = set()
+def addRelations(entity,relcollector):
+    for att in entity.get_attributes().values():
+        if isinstance(att, RelationAttribute):
+            relcollector.addDualKeyed(att.end,att.end.end,entity,att.end.entity,"label="+att.get_name())
+    for parent in entity.parent_entities:
+        if parent.get_full_name()!="std::Entity":
+            relcollector.addKeyed((entity,parent),entity, parent, "dir=forward,weight=2")
+            
+    
+
+def parse_instance_relation(link, scope,relcollector):
     parts = link.split(".")
     t = parts[0]
     links = parts[1:]
@@ -125,14 +193,9 @@ def parse_instance_relation(link, scope):
             
         for target in targets:
             if instance is not target:
-                l = sorted([instance, target])
-                relations.add((l[0], l[1]))
-    
-    return relations
+                relcollector.add(instance,target)
 
-def parse_class_relation(link, scope):
-    relations = set()
-    
+def parse_class_relation(link, scope,relcollector):
     parts = link.split(".")
     t = parts[0]
     links = parts[1:]
@@ -147,21 +210,18 @@ def parse_class_relation(link, scope):
 
     if links == "_parents":
         for parent in type_def.parent_entities:
-            relations.add((id(type_def), id(parent), ("dir=forward")))
+            relcollector.add(type_def, parent, "dir=forward")
         
     elif type_def.has_attribute(links):
         rel = type_def.get_attribute(links)
-        l = sorted([id(type_def), id(rel.type)])
-        relations.add((l[0], l[1]))
-        
-    return relations
+        relcollector.add(type_def, rel.type)
 
 def generate_diagram(config, scope):
     types = []
     links = []
     
     dot = "graph {\n"
-    
+    relations = relationCollector()    
     for line in config.split("\n"):
         line = line.strip()
         if len(line) > 0 and line[0] == "#":
@@ -174,22 +234,18 @@ def generate_diagram(config, scope):
             
     for t in types:
         if t[0] == "@":
-            dot += parse_class(t[1:], scope)
+            dot += parse_class(t[1:], scope,relations)
         else:
             dot += parse_instance(t, scope)
         
-    relations = set()    
+    
     for link in links:
         if link[0] == "@":
-            relations.update(parse_class_relation(link[1:], scope))
+            parse_class_relation(link[1:], scope,relations)
         else:
-            relations.update(parse_instance_relation(link, scope))
+            parse_instance_relation(link, scope,relations)
         
-    for rel in relations:
-        if len(rel) == 2:
-            dot += '"%s" -- "%s";\n' % rel
-        else:
-            dot += '"%s" -- "%s" [%s];\n' % rel
+    dot+= relations.dump()
             
     return dot + "}\n"
         
