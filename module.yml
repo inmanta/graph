@@ -1,8 +1,6 @@
-name: graph
-version: 0.1
-source: git@github.com:bartvb/imp-graph
-license: Apache 2.0
 author: Bart Vanbrabant <bart@impera.io>
-requires:
-    std: git@github.com:bartv/imp-std, ">= 0.4"
-
+license: Apache 2.0
+name: graph
+requires: {std: 'git@github.com:bartv/imp-std, ">= 0.4"'}
+source: git@github.com:bartvb/imp-graph
+version: 0.1.1
