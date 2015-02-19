@@ -1,6 +1,7 @@
 author: Bart Vanbrabant <bart@impera.io>
 license: Apache 2.0
 name: graph
-requires: {std: 'git@github.com:bartv/imp-std, ">= 0.4"'}
-source: git@github.com:bartvb/imp-graph
-version: 0.1.1
+source: git@git.impera.io:modulesb/graph
+version: 0.1.2
+requires: 
+    std: git@git.impera.io:modules/std, ">= 0.4"
