@@ -17,9 +17,9 @@
 """
 
 
-from Imp.export import export
-from Imp.ast.attribute import RelationAttribute
-from Imp.ast.enum import Enum
+from inmanta.export import export
+from inmanta.ast.attribute import RelationAttribute
+from inmanta.execute.proxy import DynamicProxy 
 
 import os, subprocess
 
@@ -78,9 +78,9 @@ class graphCollector(object):
             old = self.relations[("dx", l[0], l[1])][ i ];
         
         if(i==0):
-            self.relations[("dx", l[0], l[1])] = (fro, to, label,old,name)
+            self.relations[("dx", l[0], l[1])] = (fro, to, label, old, name)
         else:
-            self.relations[("dx", l[0], l[1])] = (fro, to, label,name,old)
+            self.relations[("dx", l[0], l[1])] = (fro, to, label, name, old)
                
         self.nodes.add(fro)
         self.nodes.add(to)
@@ -154,8 +154,11 @@ def is_type(instance, typestring):
 # FIXME: does not use relation collector, as such only dot output can use it,...
 def parse_instance(line, scope):
     cfg = line.split("[")
-    parts = cfg[0].split("::")
-    instances = scope.get_variable(parts[-1], parts[:-1]).value
+    type_name = cfg[0]
+    if type_name not in scope:
+        return ""
+
+    instances = scope[type_name].get_all_instances()
         
     if len(cfg) == 2:
         cfg = parse_cfg(cfg[1])
@@ -220,8 +223,7 @@ def parse_instance_relation(link, scope, relcollector):
     links = parts[1:]
         
     # get the objects
-    parts = t.split("::")
-    instances = scope.get_variable(parts[-1], parts[:-1]).value
+    instances = [DynamicProxy.return_value(i) for i in scope[t].get_all_instances()]
         
     for instance in instances:
         targets = [instance]
@@ -306,14 +308,13 @@ def collectGraph(config, scope, relations):
             
         elif line != "" and line[0] != " ":
             types.append(line)
-            
+
     for t in types:
         if t[0] == "@":
             dot += parse_class(t[1:], scope, relations)
         else:
             dot += parse_instance(t, scope)
-        
-    
+
     for link in links:
         if link[0] == "@":
             parse_class_relation(link[1:], scope, relations)
@@ -324,24 +325,25 @@ def collectGraph(config, scope, relations):
 
 @export("graph", "graph::Graph")
 def export_graph(exporter, types):
-    outdir = exporter.config.get("graph", "output-dir")
-    
+#    outdir = exporter.config.get("graph", "output-dir")
+    outdir="."
     if outdir is None:
         return
 
     if not os.path.exists(outdir):
         os.mkdir(outdir)
         
-    if exporter.config.has_option("graph", "types"):
-        file_types = [x.strip() for x in exporter.config.get("graph", "types").split(",")]
-    else:
-        file_types = []
+#    if exporter.config.has_option("graph", "types"):
+#        file_types = [x.strip() for x in exporter.config.get("graph", "types").split(",")]
+#    else:
+#        file_types = []
+    file_types=["png"]
         
     # Get all diagrams
     diagram_type = types["graph::Graph"]
     
     for graph in diagram_type:
-        dot = generate_dot(graph.config, exporter._scope)
+        dot = generate_dot(graph.config, exporter.types)
         filename = os.path.join(outdir, "%s.dot" % graph.name)
         
         with open(filename, "w+") as fd:
@@ -355,7 +357,8 @@ def export_graph(exporter, types):
 
 @export("classdiagram", "graph::Graph")
 def export_plantuml(exporter, types):
-    outdir = exporter.config.get("graph", "output-dir")
+    #outdir = exporter.config.get("graph", "output-dir")
+    outdir="."
     
     if outdir is None:
         return
@@ -363,10 +366,12 @@ def export_plantuml(exporter, types):
     if not os.path.exists(outdir):
         os.mkdir(outdir)
         
-    if exporter.config.has_option("graph", "types"):
-        file_types = [x.strip() for x in exporter.config.get("graph", "types").split(",")]
-    else:
-        file_types = []
+#    if exporter.config.has_option("graph", "types"):
+#        file_types = [x.strip() for x in exporter.config.get("graph", "types").split(",")]
+#    else:
+#        file_types = []
+    file_types=["png"]
+
         
     # Get all diagrams
     diagram_type = types["graph::Graph"]
