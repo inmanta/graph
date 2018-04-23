@@ -1,50 +1,39 @@
 """
-    Copyright 2016 Inmanta
+    Inmanta graphing module
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-    Contact: code@inmanta.com
+    :copyright: 2018 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
 """
-
-
-from inmanta.export import export
-from inmanta.ast.attribute import RelationAttribute
-from inmanta.execute.proxy import DynamicProxy
-
 import os
 import subprocess
 import re
 
-# FIXME: hack to prevent core bugs from triggering https://github.com/bartv/imp/issues/2
+from inmanta import config
+from inmanta.export import export
+from inmanta.ast.attribute import RelationAttribute
+from inmanta.execute.proxy import DynamicProxy
 
 
-def getAttributeName(attrib):
-    if isinstance(attrib, Enum):
-        return "Enum"
-    return attrib.get_name()
-
-# FIXME: hack to prevent core bugs from triggering https://github.com/bartv/imp/issues/2
+class Config(object):
+    """
+        Diagram configuration
+    """
 
 
-def getAttribType(attrib):
-    if isinstance(attrib.get_type(), Enum):
-        return "Enum"
+class EntityConfig(Config):
+    """
+        Entity instance configuration
+    """
+    def __init__(self, line):
+        pass
 
-    return str(attrib.get_type()).replace('<', '').replace('>', '').replace(' ', '_')
+
+class RelationConfig(Config):
+    pass
 
 
 class Node(object):
-
     def __init__(self, id, **props):
         self.id = id
         self.props = props
@@ -55,7 +44,6 @@ class Node(object):
 
 
 class Relation(object):
-
     def __init__(self, id, fro, to, **props):
         self.id = id
         self.fro = fro
@@ -71,7 +59,7 @@ class Relation(object):
 
 
 # FIXME: do not put tuples of different length into one dict
-class graphCollector(object):
+class GraphCollector(object):
 
     def __init__(self):
         self.relations = dict()
@@ -83,14 +71,16 @@ class graphCollector(object):
             self.nodes[node.id] = node
 
     def add(self, fro, to, label=None):
-        """add relation, overwrite any duplicate with same label and same ends (even if ends are swapped)"""
+        """
+            Add relation, overwrite any duplicate with same label and same ends (even if ends are swapped)
+        """
         l = sorted([id(fro), id(to)])
         self.addNode(Node(id=id(fro), label=fro))
         self.addNode(Node(id=id(to), label=to))
         idx = ("a", l[0], l[1], label)
         self.relations[idx] = Relation(idx, fro, to, label=label)
 
-    def addParent(self, fro, to):
+    def add_parent(self, fro, to):
         self.parents[(id(fro), id(to))] = (id(fro), id(to))
         self.addNode(Node(id=id(to), label=to))
 
@@ -114,7 +104,7 @@ class graphCollector(object):
         self.addNode(Node(id=id(fro), label=fro))
         self.addNode(Node(id=id(to), label=to))
 
-    def dumpDot(self):
+    def dump_dot(self):
         dot = ""
 
         for node in self.nodes.values():
@@ -135,7 +125,8 @@ class graphCollector(object):
             dot += 'class %s{\n' % (node.get_full_name().replace(":", "_"))
             for attrib in node.attributes.values():
                 if not isinstance(attrib, RelationAttribute):
-                    dot += ' %s %s \n' % (getAttribType(attrib), getAttributeName(attrib))
+                    dot += ' %s %s \n' % (str(attrib.get_type()).replace('<', '').replace('>', '').replace(' ', '_'),
+                                          attrib.get_name())
             dot += '}\n'
 
         for rel in self.parents:
@@ -153,18 +144,17 @@ class graphCollector(object):
 
 def parse_cfg(cfg):
     entries = cfg.replace("]", "").split(",")
-
     result = {}
     for entry in entries:
-        parts = entry.split("=")
-
-        result[parts[0]] = parts[1]
+        opt, value = entry.split("=")
+        result[opt] = value
 
     return result
 
 
 def is_type(instance, type):
     return instance.type == type or instance.type.is_subclass(type)
+
 
 # FIXME: does not use relation collector, as such only dot output can use it,...
 def parse_instance(line, scope, collector):
@@ -182,21 +172,24 @@ def parse_instance(line, scope, collector):
 
     dot = ""
     for instance in instances:
+        attributes = {k: v.value for k, v in instance.slots.items()}
         options = cfg.copy()
-        if "label" in cfg and cfg["label"] in instance.slots:
-            options['label'] = instance.get_attribute(cfg["label"]).value
+        if "label" in cfg:
+            opt = cfg["label"]
+
+            if opt in attributes:
+                options['label'] = attributes[opt]
+            elif opt[0] == '"' and opt[-1] == '"':
+                options['label'] = opt[1:-1].format_map(attributes)
         else:
             options['label'] = repr(instance)
 
-        #options = ",".join(['%s="%s"' % x for x in options.items()])
-
         collector.addNode(Node(id(instance), **options))
-        #dot += '"%s" [%s];\n' % (instance, options)
 
     return dot
 
 
-def parse_class(line, scope, relcollector):
+def parse_entity(line, scope, relcollector):
     parts = line.split("::")
     rel = False
     parents = False
@@ -222,22 +215,33 @@ def parse_class(line, scope, relcollector):
 
         relcollector.addNode(Node(id(type_def), label=type_def.get_full_name()))
         if rel:
-            addRelations(type_def, relcollector)
+            add_relations(type_def, relcollector)
         if parents:
-            addParents(type_def, relcollector)
+            add_parents(type_def, relcollector)
 
     return dot
 
 
-def addRelations(entity, relcollector):
+def add_relations(entity, relcollector):
     for att in entity.get_attributes().values():
         if isinstance(att, RelationAttribute):
             relcollector.addDualKeyed(att.end, att.end.end, entity, att.end.entity, att.get_name())
-            
-def addParents(entity, relcollector):
+
+
+def add_parents(entity, relcollector):
     for parent in entity.parent_entities:
         if parent.get_full_name() != "std::Entity":
-            relcollector.addParent(entity, parent)
+            relcollector.add_parent(entity, parent)
+
+
+def relation_options(line):
+    cfg = line.split("[")
+    relation_name = cfg[0]
+
+    if len(cfg) == 2:
+        cfg = parse_cfg(cfg[1])
+
+    return relation_name, cfg
 
 
 def parse_instance_relation(link, types, relcollector):
@@ -249,8 +253,10 @@ def parse_instance_relation(link, types, relcollector):
     instances = types[t].get_all_instances()
 
     for instance in instances:
-        targets = [("", instance)]
+        targets = [("", instance, "")]
         for link in links:
+            link, cfg = relation_options(link)
+
             tfilter = None
             if "|" in link:
                 p = link.split("|")
@@ -262,20 +268,26 @@ def parse_instance_relation(link, types, relcollector):
                 tfilter = types[tfilter]
 
             new = []
-            for name, x in targets:
+            for name, x, _ in targets:
                 result = x.get_attribute(link).value
                 if isinstance(result, list):
                     new.extend(result)
                 else:
                     new.append(result)
 
-            if tfilter is not None:
-                targets.extend([(link, x) for x in new if is_type(x, tfilter)])
+            if "label" in cfg:
+                label = cfg["label"].strip("\"")
             else:
-                targets.extend([(link, x) for x in new])
-        for link, target in targets:
+                label = link
+
+            if tfilter is not None:
+                targets.extend([(link, x, label) for x in new if is_type(x, tfilter)])
+            else:
+                targets.extend([(link, x, label) for x in new])
+
+        for link, target, label in targets:
             if instance is not target:
-                relcollector.add(instance, target, label=link)
+                relcollector.add(instance, target, label=label)
 
 
 def parse_class_relation(link, scope, relcollector):
@@ -293,7 +305,7 @@ def parse_class_relation(link, scope, relcollector):
 
     if links == "_parents":
         for parent in type_def.parent_entities:
-            relcollector.addParent(type_def, parent)
+            relcollector.add_parent(type_def, parent)
 
     elif type_def.has_attribute(links):
         rel = type_def.get_attribute(links)
@@ -302,27 +314,27 @@ def parse_class_relation(link, scope, relcollector):
 
 def generate_dot(config, types):
     dot = "graph {\n"
-    relations = graphCollector()
+    relations = GraphCollector()
 
-    collectGraph(config, types, relations)
+    collect_graph(config, types, relations)
 
-    dot += relations.dumpDot()
+    dot += relations.dump_dot()
 
     return dot + "}\n"
 
 
 def generate_plantUML(config, scope):
     dot = "@startuml\n"
-    relations = graphCollector()
+    relations = GraphCollector()
 
-    collectGraph(config, scope, relations)
+    collect_graph(config, scope, relations)
 
     dot += relations.dumpPlantUML()
 
     return dot + "@enduml\n"
 
 
-def collectGraph(config, scope, relations):
+def collect_graph(config, scope, relations):
     types = []
     links = []
     for line in config.split("\n"):
@@ -337,7 +349,7 @@ def collectGraph(config, scope, relations):
 
     for t in types:
         if t[0] == "@":
-            parse_class(t[1:], scope, relations)
+            parse_entity(t[1:], scope, relations)
         else:
             parse_instance(t, scope, relations)
 
@@ -350,19 +362,14 @@ def collectGraph(config, scope, relations):
 
 @export("graph", "graph::Graph")
 def export_graph(exporter, types):
-    #    outdir = exporter.config.get("graph", "output-dir")
-    outdir = "."
+    outdir = config.Config.get("graph", "output-dir", ".")
     if outdir is None:
         return
 
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
-#    if exporter.config.has_option("graph", "types"):
-#        file_types = [x.strip() for x in exporter.config.get("graph", "types").split(",")]
-#    else:
-#        file_types = []
-    file_types = ["png"]
+    file_types = [x.strip() for x in config.Config.get("graph", "types", "png").split(",")]
 
     # Get all diagrams
     diagram_type = types["graph::Graph"]
@@ -374,10 +381,11 @@ def export_graph(exporter, types):
         with open(filename, "w+") as fd:
             fd.write(dot)
 
-        for t in file_types:
-            retcode = subprocess.call(["dot", "-T%s" % t, "-Goverlap=scale",
-                                       "-Gdefaultdist=0.1", "-Gsplines=true", "-Gsep=.1",
-                                       "-Gepsilon=.0000001", "-o", os.path.join(outdir, "%s.%s" % (graph.name, t)), filename])
+        for file_type in file_types:
+            subprocess.check_call(["dot", "-T%s" % file_type, "-Goverlap=scale",
+                                   "-Gdefaultdist=0.1", "-Gsplines=true", "-Gsep=.1",
+                                   "-Gepsilon=.0000001", "-o", os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
+                                   filename])
 
 
 @export("classdiagram", "graph::Graph")

@@ -1,6 +1,6 @@
 author: Inmanta <code@inmanta.com>
-license: Apache 2.0
+license: Inmanta EULA
 name: graph
-version: 0.2.1
+version: 0.3.0.dev1524491363
 requires:
 - std
