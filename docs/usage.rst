@@ -11,9 +11,12 @@ Install
 
 Add in the .inmanta file of your project in the config section graph to the export option. For example:
 
+.. code-block:: config
+
   [config]
   environment=f603387a-f1af-4148-a286-c4d309ef4ada
   export=graph
+
 
 When `inmanta export` is called, the compiler will not only send the resources to the orchestration server but also
 call the graph export plugin.
