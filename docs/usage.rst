@@ -49,6 +49,7 @@ Between square brackets options can be specified:
     - label: The label of the instances. It can be either an attribute of the entity or a string indicated with double
              quotes. This string can contain formatters between curly braces {}. Between these braces name of the attributes
              can be used.
+    - container: If set to true, this node will be treated as a container that can contain other nodes. See, type=contained_in
 
 For example:
 ```
@@ -63,3 +64,6 @@ With the full name of the entity and the name of the relation, edges between ins
 
 Between square brackets options can be specified:
     - label: The label on the edge. Either the name of the attribute when nothing is specified or a string with double quotes.
+    - type: This can changes the relation type. The options are:
+        * contained_in: This means that this relation indicates that the node should be placed inside the target node of the
+                        relation.
