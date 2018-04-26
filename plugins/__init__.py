@@ -19,6 +19,8 @@ class ParseException(Exception):
     pass
 
 
+OPT_RE=re.compile(r"""\s?(:?([^,=]+)=("[^"]+"|[^,]+))+""")
+
 class Config(object):
     """
         Diagram configuration
@@ -31,16 +33,8 @@ class Config(object):
         raise NotImplementedError()
 
     def _parse_options(self, options_string):
-        opt_list = options_string.split(",")
-        options = {}
-        for opt in opt_list:
-            parts = opt.strip().split("=")
-            if len(parts) == 1:
-                options[parts[0]] = True
-            elif len(parts) == 2:
-                options[parts[0]] = parts[1]
-
-        return options
+        opt_list = OPT_RE.findall(options_string)
+        return {key: value for _, key, value in opt_list}
 
 
 class EntityConfig(Config):
@@ -57,13 +51,12 @@ class EntityConfig(Config):
 
     def parse_line(self, line):
         match = EntityConfig.re.search(line)
-
         if not match:
             raise ParseException()
 
         matches = match.groupdict()
         self.entity = matches["entity"]
-
+        print(matches)
         if "options" in matches and matches["options"]:
             self.options = self._parse_options(matches["options"])
 
@@ -324,7 +317,7 @@ class GraphCollector(object):
     #     self.add_node(Node(id=id(to), label=to))
 
     def dump_dot(self):
-        dot = "  compound=true;"
+        dot = "  compound=true;\n"
 
         dot += "\n".join(["  " + line for node in self.nodes.values() for line in node.to_dot()])
         dot += "\n"
@@ -559,8 +552,6 @@ def export_graph(exporter, types):
 
         with open(filename, "w+") as fd:
             fd.write(dot)
-
-        print(dot)
 
         for file_type in file_types:
             subprocess.check_call(["dot", "-T%s" % file_type, "-Goverlap=scale",
