@@ -56,12 +56,14 @@ class EntityConfig(Config):
 
         matches = match.groupdict()
         self.entity = matches["entity"]
-        print(matches)
+
         if "options" in matches and matches["options"]:
             self.options = self._parse_options(matches["options"])
 
         self.container = convert_boolean(self.options.get("container", False))
         self.label = self.options.get("label", None)
+        if "label" in self.options:
+            del self.options["label"]
 
     def collect(self, scope):
         if self.entity not in scope:
@@ -70,7 +72,7 @@ class EntityConfig(Config):
         instances = scope[self.entity].get_all_instances()
 
         for instance in instances:
-            options = {}
+            options = dict(self.options)
             attributes = {k: v.value for k, v in instance.slots.items()}
 
             if self.label is not None:
@@ -84,6 +86,8 @@ class EntityConfig(Config):
 
             else:
                 options["label"] = repr(instance)
+            
+
 
             self.collector.add_node(Node(instance, subgraph=self.container, **options))
 

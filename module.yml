@@ -1,6 +1,6 @@
 author: Inmanta <code@inmanta.com>
 license: Inmanta EULA
 name: graph
-version: 0.3.1
+version: 0.4.0
 requires:
 - std
