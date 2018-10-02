@@ -558,10 +558,16 @@ def export_graph(exporter, types):
             fd.write(dot)
 
         for file_type in file_types:
-            subprocess.check_call(["dot", "-T%s" % file_type, "-Goverlap=scale",
+            try:
+                subprocess.check_call(["dot", "-T%s" % file_type, "-Goverlap=scale",
                                    "-Gdefaultdist=0.1", "-Gsplines=true", "-Gsep=.1",
                                    "-Gepsilon=.0000001", "-o", os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
                                    filename])
+            except:
+                print("Could not render graph, please execute " + " ".join(["dot", "-T%s" % file_type, "-Goverlap=scale",
+                                   "-Gdefaultdist=0.1", "-Gsplines=true", "-Gsep=.1",
+                                   "-Gepsilon=.0000001", "-o", os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
+                                   filename]))
 
 
 # @export("classdiagram", "graph::Graph")
