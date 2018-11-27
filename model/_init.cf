@@ -19,3 +19,19 @@ end
 
 implement Graph using std::none
 
+
+entity ClassDiagram:
+    """
+        Create a class diagram of a given module expression
+
+        :param name The name of the graph, this is used to determine the name
+                    of the resulting image file
+        :param moduleexpression List of regexes matching module names
+        :param header: file header for plantuml file
+    """
+    string name
+    string[] moduleexpression
+    string header = ""
+end
+
+implement ClassDiagram using std::none

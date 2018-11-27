@@ -6,25 +6,29 @@
     :license: Inmanta EULA
 """
 import os
-import subprocess
 import re
+import subprocess
+from email import header
 
 from inmanta import config
+from inmanta.ast.attribute import RelationAttribute
+from inmanta.ast.entity import Entity
 from inmanta.data import convert_boolean
 from inmanta.export import export
-from inmanta.ast.attribute import RelationAttribute
 
 
 class ParseException(Exception):
     pass
 
 
-OPT_RE=re.compile(r"""\s?(:?([^,=]+)=("[^"]+"|[^,]+))+""")
+OPT_RE = re.compile(r"""\s?(:?([^,=]+)=("[^"]+"|[^,]+))+""")
+
 
 class Config(object):
     """
         Diagram configuration
     """
+
     def __init__(self, collector, line):
         self.collector = collector
         self.parse_line(line)
@@ -41,6 +45,7 @@ class EntityConfig(Config):
     """
         Entity instance configuration
     """
+
     re = re.compile(r"^(?P<entity>[^:]+::[^.\[]+)(\[(?P<options>([^,\]]+,?)*)\])?$")
 
     def __init__(self, collector, line):
@@ -86,20 +91,25 @@ class EntityConfig(Config):
 
             else:
                 options["label"] = repr(instance)
-            
-
 
             self.collector.add_node(Node(instance, subgraph=self.container, **options))
 
     def __repr__(self):
-        return self.entity + " -> " + ", ".join(["%s=%s" % x for x in self.options.items()])
+        return (
+            self.entity
+            + " -> "
+            + ", ".join(["%s=%s" % x for x in self.options.items()])
+        )
 
 
 class RelationConfig(Config):
     """
         Instance relation configuration
     """
-    re = re.compile(r"^(?P<entity>[^:]+::[^.]+)(?P<relations>(\.[^\[]+)+)(\[(?P<options>([^,\]]+,?)*)\])?")
+
+    re = re.compile(
+        r"^(?P<entity>[^:]+::[^.]+)(?P<relations>(\.[^\[]+)+)(\[(?P<options>([^,\]]+,?)*)\])?"
+    )
 
     def __init__(self, collector, line):
         self.entity = None
@@ -163,7 +173,13 @@ class RelationConfig(Config):
                     self.collector.add_relation(instance, target)
 
     def __repr__(self):
-        return self.entity + " -> " + repr(self.relation) + " -> " + ", ".join(["%s=%s" % x for x in self.options.items()])
+        return (
+            self.entity
+            + " -> "
+            + repr(self.relation)
+            + " -> "
+            + ", ".join(["%s=%s" % x for x in self.options.items()])
+        )
 
 
 PARSERS = [EntityConfig, RelationConfig]
@@ -181,6 +197,7 @@ class Node(object):
     """
         A graphviz node
     """
+
     def __init__(self, node_id, subgraph=False, **props):
         self.node_id = node_id
         self.props = props
@@ -200,8 +217,11 @@ class Node(object):
             return ['"%s" [%s];' % (self, options)]
         else:
             node_strings = ["subgraph cluster_{0} {{".format(self)]
-            node_strings += ["  {key}=\"{value}\"".format(key=k, value=v) for k, v in self.props.items()]
-            node_strings += ["  \"{0}\";".format(str(child)) for child in self.children]
+            node_strings += [
+                '  {key}="{value}"'.format(key=k, value=v)
+                for k, v in self.props.items()
+            ]
+            node_strings += ['  "{0}";'.format(str(child)) for child in self.children]
             node_strings += ["}"]
 
             return node_strings
@@ -222,6 +242,7 @@ class Relation(object):
     """
         A graphviz edge between two nodes
     """
+
     def __init__(self, relation_id, from_node, to_node, **props):
         self.relation_id = relation_id
         self.from_node = from_node
@@ -242,7 +263,9 @@ class Relation(object):
             # select random one of the children, otherwise graphviz complains
             to_id = str(self.to_node.children[0])
 
-        options = ",".join(['%s="%s"' % x for x in self.props.items() if x[1] is not None])
+        options = ",".join(
+            ['%s="%s"' % x for x in self.props.items() if x[1] is not None]
+        )
         if not options:
             return '"%s" -- "%s";\n' % (from_id, to_id)
         else:
@@ -250,7 +273,6 @@ class Relation(object):
 
 
 class GraphCollector(object):
-
     def __init__(self):
         self.relations = dict()
         self.parents = dict()
@@ -323,7 +345,9 @@ class GraphCollector(object):
     def dump_dot(self):
         dot = "  compound=true;\n"
 
-        dot += "\n".join(["  " + line for node in self.nodes.values() for line in node.to_dot()])
+        dot += "\n".join(
+            ["  " + line for node in self.nodes.values() for line in node.to_dot()]
+        )
         dot += "\n"
 
         for rel in self.relations.values():
@@ -377,16 +401,16 @@ def parse_entity(line, scope, relcollector):
     rel = False
     parents = False
 
-    if parts[-1] == '*':
+    if parts[-1] == "*":
         types = [t for (k, t) in scope.items() if re.search(line, k)]
-    elif parts[-1] == '**':
-        parts[-1] = '*'
+    elif parts[-1] == "**":
+        parts[-1] = "*"
         rel = True
         parents = True
         line = "::".join(parts)
         types = [t for (k, t) in scope.items() if re.search(line, k)]
-    elif parts[-1] == '*+':
-        parts[-1] = '*'
+    elif parts[-1] == "*+":
+        parts[-1] = "*"
         parents = True
         line = "::".join(parts)
         types = [t for (k, t) in scope.items() if re.search(line, k)]
@@ -408,7 +432,9 @@ def parse_entity(line, scope, relcollector):
 def add_relations(entity, relcollector):
     for att in entity.get_attributes().values():
         if isinstance(att, RelationAttribute):
-            relcollector.add_dual_keyed(att.end, att.end.end, entity, att.end.entity, att.get_name())
+            relcollector.add_dual_keyed(
+                att.end, att.end.end, entity, att.end.entity, att.get_name()
+            )
 
 
 def add_parents(entity, relcollector):
@@ -459,7 +485,7 @@ def parse_instance_relation(link, types, relcollector):
                     new.append(result)
 
             if "label" in cfg:
-                label = cfg["label"].strip("\"")
+                label = cfg["label"].strip('"')
             else:
                 label = link
 
@@ -536,6 +562,105 @@ def collect_graph(diagram_config, scope, collector):
     #         parse_instance_relation(link, scope, relations)
 
 
+def generate_plantuml(
+    moduleexpression,
+    types,
+    parents_to_root=True,
+    relations_escape=True,
+    attributes=True,
+):
+    moduleexpression = [re.compile(r) for r in moduleexpression]
+
+    def name_matches(name):
+        return any((r.match(name) for r in moduleexpression))
+
+    # collect types
+    mytypes = {
+        k: v for k, v in types.items() if name_matches(k) and isinstance(v, Entity)
+    }
+
+    # collect relations
+    allrelations = [
+        r
+        for e in mytypes.values()
+        for r in e.get_attributes().values()
+        if isinstance(r, RelationAttribute)
+    ]
+    if not relations_escape:
+        allrelations = [
+            r for r in allrelations if r.get_type().get_full_name() in mytypes
+        ]
+    paired = set()
+    for r in allrelations:
+        if r.end not in paired:
+            paired.add(r)
+
+    def emit_class(entity):
+        if not attributes:
+            return "class %s" % entity.get_full_name()
+        else:
+            myattributes = [
+                r
+                for r in entity.get_attributes().values()
+                if not isinstance(r, RelationAttribute)
+            ]
+            atts = [
+                "%s %s" % (a.get_type().type_string(), a.get_name())
+                for a in myattributes
+            ]
+            return """class %s {
+    %s
+}""" % (
+                entity.get_full_name(),
+                "\n".join(atts),
+            )
+
+    # emit classes
+    classes = [emit_class(cl) for cl in mytypes.values()]
+    # emit inheritance
+    inh = [
+        "%(parent)s <|-- %(child)s" % {"parent": parent, "child": child}
+        for child in mytypes.values()
+        for parent in child.parent_entities
+        if parent.get_full_name() != "std::Entity"
+        and (parents_to_root or parent.get_full_name() in mytypes)
+    ]
+    # emit relations
+    def arity(r):
+        if r.low == 1:
+            if r.high == 1:
+                return "1"
+            if r.high is None:
+                return "+"
+        if r.low == 0:
+            if r.high == 1:
+                return "?"
+            if r.high is None:
+                return "*"
+        return "[%d:%s]" % (r.low, r.high if r.high is not None else "")
+
+    def emit_relation(r):
+        if r.end is None:
+            return '%s "%s" -->  %s: %s' % (
+                r.get_entity().get_full_name(),
+                arity(r),
+                r.get_type().get_full_name(),
+                r.get_name(),
+            )
+        else:
+            return """%s "%s" -- "%s" %s : %s >""" % (
+                r.get_entity().get_full_name(),
+                arity(r),
+                arity(r.end),
+                r.get_type().get_full_name(),
+                r.get_name(),
+            )
+
+    rel = [emit_relation(r) for r in paired]
+
+    return "\n".join(classes + inh + rel)
+
+
 @export("graph", "graph::Graph")
 def export_graph(exporter, types):
     outdir = config.Config.get("graph", "output-dir", ".")
@@ -545,7 +670,9 @@ def export_graph(exporter, types):
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
-    file_types = [x.strip() for x in config.Config.get("graph", "types", "png").split(",")]
+    file_types = [
+        x.strip() for x in config.Config.get("graph", "types", "png").split(",")
+    ]
 
     # Get all diagrams
     diagram_type = types["graph::Graph"]
@@ -559,15 +686,59 @@ def export_graph(exporter, types):
 
         for file_type in file_types:
             try:
-                subprocess.check_call(["dot", "-T%s" % file_type, "-Goverlap=scale",
-                                   "-Gdefaultdist=0.1", "-Gsplines=true", "-Gsep=.1",
-                                   "-Gepsilon=.0000001", "-o", os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
-                                   filename])
+                subprocess.check_call(
+                    [
+                        "dot",
+                        "-T%s" % file_type,
+                        "-Goverlap=scale",
+                        "-Gdefaultdist=0.1",
+                        "-Gsplines=true",
+                        "-Gsep=.1",
+                        "-Gepsilon=.0000001",
+                        "-o",
+                        os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
+                        filename,
+                    ]
+                )
             except:
-                print("Could not render graph, please execute " + " ".join(["dot", "-T%s" % file_type, "-Goverlap=scale",
-                                   "-Gdefaultdist=0.1", "-Gsplines=true", "-Gsep=.1",
-                                   "-Gepsilon=.0000001", "-o", os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
-                                   filename]))
+                print(
+                    "Could not render graph, please execute "
+                    + " ".join(
+                        [
+                            "dot",
+                            "-T%s" % file_type,
+                            "-Goverlap=scale",
+                            "-Gdefaultdist=0.1",
+                            "-Gsplines=true",
+                            "-Gsep=.1",
+                            "-Gepsilon=.0000001",
+                            "-o",
+                            os.path.join(outdir, "%s.%s" % (graph.name, file_type)),
+                            filename,
+                        ]
+                    )
+                )
+
+
+@export("classdiagram", "graph::ClassDiagram")
+def export_classdiagram(exporter, types):
+    outdir = config.Config.get("graph", "output-dir", ".")
+    if outdir is None:
+        return
+
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    # Get all diagrams
+    diagram_type = types["graph::ClassDiagram"]
+    for graph in diagram_type:
+        cdiag = generate_plantuml(graph.moduleexpression, exporter.types)
+        filename = os.path.join(outdir, "%s.puml" % graph.name)
+
+        with open(filename, "w+") as fd:
+            if graph.header != "":
+                fd.write(graph.header + "\n")
+            fd.write(cdiag)
 
 
 # @export("classdiagram", "graph::Graph")
