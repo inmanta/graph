@@ -137,6 +137,8 @@ class RelationConfig(Config):
         """
             Collect the list of targets given the instance and the path list
         """
+        if instance is None:
+            return []
         attributes = {k: v.value for k, v in instance.slots.items()}
         targets = []
         if not paths:
@@ -169,6 +171,10 @@ class RelationConfig(Config):
                     target_node = self.collector.get_or_add(target)
                     from_node = self.collector.get_or_add(instance)
                     target_node.add_child(from_node)
+                elif self.type == "contained_by":
+                    target_node = self.collector.get_or_add(target)
+                    from_node = self.collector.get_or_add(instance)
+                    from_node.add_child(target_node)
                 else:
                     self.collector.add_relation(instance, target)
 
@@ -226,6 +232,12 @@ class Node(object):
 
             return node_strings
 
+    def get_id(self):
+        if not self.subgraph:
+            return str(self)
+        else:
+            return f"cluster_{ str(self)}"
+
     def __str__(self):
         return str(id(self.node_id))
 
@@ -250,16 +262,16 @@ class Relation(object):
         self.props = props
 
     def to_dot(self):
-        from_id = str(self.from_node)
-        to_id = str(self.to_node)
+        from_id = self.from_node.get_id()
+        to_id = self.to_node.get_id()
 
         if self.from_node.subgraph and self.from_node.children:
-            self.props["ltail"] = "cluster_" + from_id
+            self.props["ltail"] = from_id
             # select random one of the children, otherwise graphviz complains
             from_id = str(self.from_node.children[0])
 
         if self.to_node.subgraph and self.to_node.children:
-            self.props["lhead"] = "cluster_" + to_id
+            self.props["lhead"] = to_id
             # select random one of the children, otherwise graphviz complains
             to_id = str(self.to_node.children[0])
 
