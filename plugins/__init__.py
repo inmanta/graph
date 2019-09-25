@@ -176,7 +176,7 @@ class RelationConfig(Config):
                     from_node = self.collector.get_or_add(instance)
                     from_node.add_child(target_node)
                 else:
-                    self.collector.add_relation(instance, target)
+                    self.collector.add_relation(instance, target, **self.options)
 
     def __repr__(self):
         return (
@@ -315,7 +315,7 @@ class GraphCollector(object):
 
         return node
 
-    def add_relation(self, from_instance, to_instance, label=None):
+    def add_relation(self, from_instance, to_instance, label=None, **kwargs):
         """
             Add relation, overwrite any duplicate with same label and same ends (even if ends are swapped)
         """
@@ -325,7 +325,7 @@ class GraphCollector(object):
         node_list = sorted([str(from_node), str(to_node)])
         idx = (node_list[0], node_list[1], label)
 
-        self.relations[idx] = Relation(idx, from_node, to_node, label=label)
+        self.relations[idx] = Relation(idx, from_node, to_node, label=label, **kwargs)
 
     # def add_parent(self, fro, to):
     #     self.parents[(id(fro), id(to))] = (id(fro), id(to))
