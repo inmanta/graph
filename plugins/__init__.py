@@ -3,13 +3,14 @@
 
     :copyright: 2018 Inmanta
     :contact: code@inmanta.com
-    :license: Inmanta EULA
+    :license: ASL 2.0
 """
 import os
 import re
 import subprocess
-from email import header
+from typing import List
 
+import inmanta
 from inmanta import config
 from inmanta.ast.attribute import RelationAttribute
 from inmanta.ast.entity import Entity
@@ -26,7 +27,7 @@ OPT_RE = re.compile(r"""\s?(:?([^,=]+)=("[^"]+"|[^,]+))+""")
 
 class Config(object):
     """
-        Diagram configuration
+    Diagram configuration
     """
 
     def __init__(self, collector, line):
@@ -43,7 +44,7 @@ class Config(object):
 
 class EntityConfig(Config):
     """
-        Entity instance configuration
+    Entity instance configuration
     """
 
     re = re.compile(r"^(?P<entity>[^:]+::[^.\[]+)(\[(?P<options>([^,\]]+,?)*)\])?$")
@@ -104,7 +105,7 @@ class EntityConfig(Config):
 
 class RelationConfig(Config):
     """
-        Instance relation configuration
+    Instance relation configuration
     """
 
     re = re.compile(
@@ -135,7 +136,7 @@ class RelationConfig(Config):
 
     def collect_targets(self, instance, paths):
         """
-            Collect the list of targets given the instance and the path list
+        Collect the list of targets given the instance and the path list
         """
         if instance is None:
             return []
@@ -201,7 +202,7 @@ def parse_config_line(collector, line):
 
 class Node(object):
     """
-        A graphviz node
+    A graphviz node
     """
 
     def __init__(self, node_id, subgraph=False, **props):
@@ -212,7 +213,7 @@ class Node(object):
 
     def add_child(self, child):
         """
-            Add a child. This will automatically convert this node to a subgraph
+        Add a child. This will automatically convert this node to a subgraph
         """
         self.subgraph = True
         self.children.append(child)
@@ -243,7 +244,7 @@ class Node(object):
 
     def merge_node(self, other):
         """
-            Merge the settings of the given node
+        Merge the settings of the given node
         """
         self.props.update(other.props)
         self.subgraph = other.subgraph
@@ -252,7 +253,7 @@ class Node(object):
 
 class Relation(object):
     """
-        A graphviz edge between two nodes
+    A graphviz edge between two nodes
     """
 
     def __init__(self, relation_id, from_node, to_node, **props):
@@ -299,7 +300,7 @@ class GraphCollector(object):
 
     def get_node(self, instance: "inmanta.execute.runtime.Instance") -> "Node":
         """
-            Get the node that represents the given instance
+        Get the node that represents the given instance
         """
         if instance in self.nodes:
             return self.nodes[instance]
@@ -307,7 +308,7 @@ class GraphCollector(object):
 
     def get_or_add(self, instance: "inmanta.execute.runtime.Instance") -> "Node":
         """
-            Get or add a node
+        Get or add a node
         """
         node = self.get_node(instance)
         if node is None:
@@ -317,7 +318,7 @@ class GraphCollector(object):
 
     def add_relation(self, from_instance, to_instance, label=None, **kwargs):
         """
-            Add relation, overwrite any duplicate with same label and same ends (even if ends are swapped)
+        Add relation, overwrite any duplicate with same label and same ends (even if ends are swapped)
         """
         from_node = self.get_or_add(from_instance)
         to_node = self.get_or_add(to_instance)
@@ -637,6 +638,7 @@ def generate_plantuml(
         if parent.get_full_name() != "std::Entity"
         and (parents_to_root or parent.get_full_name() in mytypes)
     ]
+
     # emit relations
     def arity(r):
         if r.low == 1:
@@ -712,7 +714,7 @@ def export_graph(exporter, types):
                         filename,
                     ]
                 )
-            except:
+            except Exception:
                 print(
                     "Could not render graph, please execute "
                     + " ".join(
