@@ -750,9 +750,11 @@ def export_classdiagram(exporter, types):
         filename = os.path.join(outdir, "%s.puml" % graph.name)
 
         with open(filename, "w+") as fd:
+            fd.write("@startuml\n")
             if graph.header != "":
                 fd.write(graph.header + "\n")
             fd.write(cdiag)
+            fd.write("\n@enduml\n")
 
 
 # @export("classdiagram", "graph::Graph")
