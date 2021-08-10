@@ -1,9 +1,19 @@
 """
-    Inmanta graphing module
+    Copyright 2021 Inmanta
 
-    :copyright: 2018 Inmanta
-    :contact: code@inmanta.com
-    :license: ASL 2.0
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+    Contact: code@inmanta.com
 """
 import os
 import re
@@ -96,11 +106,7 @@ class EntityConfig(Config):
             self.collector.add_node(Node(instance, subgraph=self.container, **options))
 
     def __repr__(self):
-        return (
-            self.entity
-            + " -> "
-            + ", ".join(["%s=%s" % x for x in self.options.items()])
-        )
+        return self.entity + " -> " + ", ".join(["%s=%s" % x for x in self.options.items()])
 
 
 class RelationConfig(Config):
@@ -108,9 +114,7 @@ class RelationConfig(Config):
     Instance relation configuration
     """
 
-    re = re.compile(
-        r"^(?P<entity>[^:]+::[^.]+)(?P<relations>(\.[^\[]+)+)(\[(?P<options>([^,\]]+,?)*)\])?"
-    )
+    re = re.compile(r"^(?P<entity>[^:]+::[^.]+)(?P<relations>(\.[^\[]+)+)(\[(?P<options>([^,\]]+,?)*)\])?")
 
     def __init__(self, collector, line):
         self.entity = None
@@ -180,13 +184,7 @@ class RelationConfig(Config):
                     self.collector.add_relation(instance, target, **self.options)
 
     def __repr__(self):
-        return (
-            self.entity
-            + " -> "
-            + repr(self.relation)
-            + " -> "
-            + ", ".join(["%s=%s" % x for x in self.options.items()])
-        )
+        return self.entity + " -> " + repr(self.relation) + " -> " + ", ".join(["%s=%s" % x for x in self.options.items()])
 
 
 PARSERS = [EntityConfig, RelationConfig]
@@ -224,10 +222,7 @@ class Node(object):
             return ['"%s" [%s];' % (self, options)]
         else:
             node_strings = ["subgraph cluster_{0} {{".format(self)]
-            node_strings += [
-                '  {key}="{value}"'.format(key=k, value=v)
-                for k, v in self.props.items()
-            ]
+            node_strings += ['  {key}="{value}"'.format(key=k, value=v) for k, v in self.props.items()]
             node_strings += ['  "{0}";'.format(str(child)) for child in self.children]
             node_strings += ["}"]
 
@@ -276,9 +271,7 @@ class Relation(object):
             # select random one of the children, otherwise graphviz complains
             to_id = str(self.to_node.children[0])
 
-        options = ",".join(
-            ['%s="%s"' % x for x in self.props.items() if x[1] is not None]
-        )
+        options = ",".join(['%s="%s"' % x for x in self.props.items() if x[1] is not None])
         if not options:
             return '"%s" -- "%s";\n' % (from_id, to_id)
         else:
@@ -358,9 +351,7 @@ class GraphCollector(object):
     def dump_dot(self):
         dot = "  compound=true;\n"
 
-        dot += "\n".join(
-            ["  " + line for node in self.nodes.values() for line in node.to_dot()]
-        )
+        dot += "\n".join(["  " + line for node in self.nodes.values() for line in node.to_dot()])
         dot += "\n"
 
         for rel in self.relations.values():
@@ -445,9 +436,7 @@ def parse_entity(line, scope, relcollector):
 def add_relations(entity, relcollector):
     for att in entity.get_attributes().values():
         if isinstance(att, RelationAttribute):
-            relcollector.add_dual_keyed(
-                att.end, att.end.end, entity, att.end.entity, att.get_name()
-            )
+            relcollector.add_dual_keyed(att.end, att.end.end, entity, att.end.entity, att.get_name())
 
 
 def add_parents(entity, relcollector):
@@ -588,21 +577,12 @@ def generate_plantuml(
         return any((r.match(name) for r in moduleexpression))
 
     # collect types
-    mytypes = {
-        k: v for k, v in types.items() if name_matches(k) and isinstance(v, Entity)
-    }
+    mytypes = {k: v for k, v in types.items() if name_matches(k) and isinstance(v, Entity)}
 
     # collect relations
-    allrelations = [
-        r
-        for e in mytypes.values()
-        for r in e.get_attributes().values()
-        if isinstance(r, RelationAttribute)
-    ]
+    allrelations = [r for e in mytypes.values() for r in e.get_attributes().values() if isinstance(r, RelationAttribute)]
     if not relations_escape:
-        allrelations = [
-            r for r in allrelations if r.get_type().get_full_name() in mytypes
-        ]
+        allrelations = [r for r in allrelations if r.get_type().get_full_name() in mytypes]
     paired = set()
     for r in allrelations:
         if r.end not in paired:
@@ -612,15 +592,8 @@ def generate_plantuml(
         if not attributes:
             return "class %s" % entity.get_full_name()
         else:
-            myattributes = [
-                r
-                for r in entity.get_attributes().values()
-                if not isinstance(r, RelationAttribute)
-            ]
-            atts = [
-                "%s %s" % (a.get_type().type_string(), a.get_name())
-                for a in myattributes
-            ]
+            myattributes = [r for r in entity.get_attributes().values() if not isinstance(r, RelationAttribute)]
+            atts = ["%s %s" % (a.get_type().type_string(), a.get_name()) for a in myattributes]
             return """class %s {
     %s
 }""" % (
@@ -635,8 +608,7 @@ def generate_plantuml(
         "%(parent)s <|-- %(child)s" % {"parent": parent, "child": child}
         for child in mytypes.values()
         for parent in child.parent_entities
-        if parent.get_full_name() != "std::Entity"
-        and (parents_to_root or parent.get_full_name() in mytypes)
+        if parent.get_full_name() != "std::Entity" and (parents_to_root or parent.get_full_name() in mytypes)
     ]
 
     # emit relations
@@ -684,9 +656,7 @@ def export_graph(exporter, types):
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
-    file_types = [
-        x.strip() for x in config.Config.get("graph", "types", "png").split(",")
-    ]
+    file_types = [x.strip() for x in config.Config.get("graph", "types", "png").split(",")]
 
     # Get all diagrams
     diagram_type = types["graph::Graph"]
