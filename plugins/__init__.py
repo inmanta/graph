@@ -423,7 +423,6 @@ def parse_entity(line, scope, relcollector):
 
     dot = ""
     for type_def in types:
-
         relcollector.add_node(Node(id(type_def), label=type_def.get_full_name()))
         if rel:
             add_relations(type_def, relcollector)
