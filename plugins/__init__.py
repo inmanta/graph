@@ -642,6 +642,7 @@ def generate_plantuml(
             )
 
     rel = [emit_relation(r) for r in paired]
+    rel.sort()
 
     return "\n".join(classes + inh + rel)
 
