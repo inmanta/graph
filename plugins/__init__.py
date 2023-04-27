@@ -582,6 +582,9 @@ def generate_plantuml(
     allrelations = [r for e in mytypes.values() for r in e.get_attributes().values() if isinstance(r, RelationAttribute)]
     if not relations_escape:
         allrelations = [r for r in allrelations if r.get_type().get_full_name() in mytypes]
+
+    # We use a dict to benefit from insertion-order and have deterministic puml
+    # see https://github.com/inmanta/graph/pull/100
     paired = dict()
     for r in allrelations:
         if r.end not in paired:
@@ -641,7 +644,7 @@ def generate_plantuml(
                 r.get_name(),
             )
 
-    rel = [emit_relation(r) for r in list(paired.keys())]
+    rel = [emit_relation(r) for r in paired.keys()]
 
     return "\n".join(classes + inh + rel)
 
