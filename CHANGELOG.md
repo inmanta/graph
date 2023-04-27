@@ -2,6 +2,7 @@
 
 ## v0.8.13 - ?
 
+- fix non-deterministic plantuml
 
 V0.8.7
 - Remove pytest.ini and move its logic to pyproject.toml
