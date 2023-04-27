@@ -583,7 +583,7 @@ def generate_plantuml(
     if not relations_escape:
         allrelations = [r for r in allrelations if r.get_type().get_full_name() in mytypes]
 
-    # We use a dict to benefit from insertion-order in order to have deterministic puml
+    # We use a dict to benefit from insertion-order in order to have deterministic plantuml
     # see https://github.com/inmanta/graph/pull/100
     paired = dict()
     for r in allrelations:
