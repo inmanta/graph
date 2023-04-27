@@ -582,10 +582,10 @@ def generate_plantuml(
     allrelations = [r for e in mytypes.values() for r in e.get_attributes().values() if isinstance(r, RelationAttribute)]
     if not relations_escape:
         allrelations = [r for r in allrelations if r.get_type().get_full_name() in mytypes]
-    paired = set()
+    paired = dict()
     for r in allrelations:
         if r.end not in paired:
-            paired.add(r)
+            paired[r] = None
 
     def emit_class(entity):
         if not attributes:
@@ -641,8 +641,7 @@ def generate_plantuml(
                 r.get_name(),
             )
 
-    rel = [emit_relation(r) for r in paired]
-    rel.sort()
+    rel = [emit_relation(r) for r in list(paired.keys())]
 
     return "\n".join(classes + inh + rel)
 
